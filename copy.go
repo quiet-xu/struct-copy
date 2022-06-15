@@ -49,7 +49,7 @@ func StructCopy(dst interface{}, src interface{}, depth int) (err error) {
 	numDstField := dstType.Elem().NumField()
 	for index := 0; index < numDstField; index++ {
 		fieldName := dstType.Elem().Field(index).Name
-		if valueMap[fieldName] == nil {
+		if valueMap[fieldName] == nil || isBlank(reflect.ValueOf(valueMap[fieldName])) {
 			continue
 		}
 		fieldValue := reflect.ValueOf(dst).Elem().Field(index)
@@ -160,7 +160,7 @@ func structChildCopy(dst reflect.Value, src interface{}, depth int, current int)
 	numDstField := reflect.TypeOf(convDst.Interface()).NumField()
 	for index := 0; index < numDstField; index++ {
 		fieldName := reflect.TypeOf(convDst.Interface()).Field(index).Name
-		if valueMap[fieldName] == nil {
+		if valueMap[fieldName] == nil || isBlank(reflect.ValueOf(valueMap[fieldName])) {
 			continue
 		} else {
 			fieldValue := dst.Field(index)
@@ -292,4 +292,25 @@ func CopyMap(dst interface{}, valueMap map[string]interface{}) (err error) {
 		}
 	}
 	return
+}
+
+// isBlank 非空校验
+func isBlank(value reflect.Value) bool {
+	switch value.Kind() {
+	case reflect.String:
+		return value.Len() == 0
+	case reflect.Bool:
+		return !value.Bool()
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return value.Int() == 0
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return value.Uint() == 0
+	case reflect.Float32, reflect.Float64:
+		return value.Float() == 0
+	case reflect.Interface, reflect.Ptr:
+		return value.IsNil()
+	case reflect.Slice:
+		return value.Len() == 0
+	}
+	return reflect.DeepEqual(value.Interface(), reflect.Zero(value.Type()).Interface())
 }
