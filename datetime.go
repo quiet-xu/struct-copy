@@ -107,6 +107,12 @@ func (j Datetime) FromString(dateString string) (Datetime, error) {
 	}
 	return Datetime(t), nil
 }
+
+func (j Datetime) CopyStr(dateStr string) any {
+	t, _ := time.Parse("2006-1-2 15:04:05", dateStr)
+	j = Datetime(t)
+	return j
+}
 func StringToDatetime(dateString string) Datetime {
 	//Datetime{}的零值好像不带时区
 	var t time.Time
