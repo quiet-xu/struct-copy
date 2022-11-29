@@ -65,6 +65,15 @@ func StructCopy(dst interface{}, src interface{}, depth int) (err error) {
 		}
 		switch valueType {
 		case reflect.Struct:
+			if reflect.TypeOf(valueMap[fieldName]).Implements(OtherDateType) {
+				switch reflect.ValueOf(dst).Elem().Field(index).Interface().(type) {
+				case string:
+					fValue := valueMap[fieldName].(ConvCopy).String()
+					reflect.ValueOf(dst).Elem().Field(index).Set(reflect.ValueOf(fValue))
+					continue
+				}
+
+			}
 			err = structChildCopy(fieldValue, valueMap[fieldName], depth, 0)
 			if err != nil {
 				return
@@ -85,7 +94,12 @@ func StructCopy(dst interface{}, src interface{}, depth int) (err error) {
 			}
 
 			if reflect.TypeOf(fieldValue.Interface()).Implements(OtherDateType) {
-				fValue = fieldValue.Interface().(ConvCopy).CopyStr(fValue.(string))
+				switch fValue.(type) {
+				case string:
+					fValue = fieldValue.Interface().(ConvCopy).CopyStr(fValue.(string))
+				default:
+
+				}
 			}
 			if fieldValue.Kind() == reflect.Ptr {
 				//如果是个指针，则操作该指针给予新的地址
@@ -325,4 +339,5 @@ func isBlank(value reflect.Value) bool {
 
 type ConvCopy interface {
 	CopyStr(string) any
+	String() string
 }
