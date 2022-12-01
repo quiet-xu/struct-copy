@@ -1,3 +1,3 @@
-module github.com/quiet-xu/struct-copy/v2
+module github.com/quiet-xu/struct-copy
 
 go 1.18
