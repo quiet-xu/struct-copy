@@ -108,25 +108,26 @@ func structChildCopy(dst reflect.Value, src interface{}, depth int, current int)
 		fieldType := convType.Field(index)
 		fieldName := fieldType.Name
 		fieldValue := dst.Field(index)
-		if fieldType.Anonymous {
+		//若非暴露的,则不需要set
+		if !fieldType.IsExported() {
+			continue
+		}
+		//如果是匿名嵌套字段，则要判断src里是否存在同样的内容的结构
+		if fieldType.Anonymous && valueMap[fieldName] == nil {
 			err = structChildCopy(fieldValue, src, depth, current)
 			if err != nil {
 				return
 			}
 			continue
 		}
-
 		if valueMap[fieldName] == nil || isBlank(reflect.ValueOf(valueMap[fieldName])) {
 			continue
 		}
-
 		if fieldValue.Type() == reflect.ValueOf(valueMap[fieldName]).Type() {
 			fieldValue.Set(reflect.ValueOf(valueMap[fieldName]))
 			continue
 		}
-		if !reflect.TypeOf(src).Field(index).IsExported() {
-			continue
-		}
+
 		valueType := reflect.TypeOf(valueMap[fieldName]).Kind()
 		if reflect.ValueOf(valueMap[fieldName]).Type() == dst.Type() {
 			convDst.Field(index).Set(reflect.ValueOf(valueMap[fieldName]))
@@ -135,6 +136,7 @@ func structChildCopy(dst reflect.Value, src interface{}, depth int, current int)
 		}
 		switch valueType {
 		case reflect.Struct:
+
 			if reflect.TypeOf(valueMap[fieldName]).Implements(OtherDateType) {
 				switch fieldValue.Interface().(type) {
 				case string:
