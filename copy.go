@@ -8,7 +8,7 @@ import (
 var OtherDateType = reflect.TypeOf((*ConvCopy)(nil)).Elem()
 
 //StructCopy 指针接收 / 非指针发送 / 深度 单位 个
-func StructCopy(dst interface{}, src interface{}, depth int) (err error) {
+func StructCopy(dst any, src any, depth int) (err error) {
 	//类型判断并声明  防重复反射
 	dstType := reflect.TypeOf(dst)
 	srcType := reflect.TypeOf(src)
@@ -32,7 +32,7 @@ func StructCopy(dst interface{}, src interface{}, depth int) (err error) {
 	err = structChildCopy(v, src, depth, 0)
 	return
 }
-func checkTypeAndConv(newValue reflect.Value, dstField reflect.Value) (fValue interface{}, err error) {
+func checkTypeAndConv(newValue reflect.Value, dstField reflect.Value) (fValue any, err error) {
 	switch newValue.Interface().(type) {
 	case int32:
 		switch dstField.Interface().(type) {
@@ -68,7 +68,7 @@ func checkTypeAndConv(newValue reflect.Value, dstField reflect.Value) (fValue in
 }
 
 //structChildCopy 结构体子层copy
-func structChildCopy(dst reflect.Value, src interface{}, depth int, current int) (err error) {
+func structChildCopy(dst reflect.Value, src any, depth int, current int) (err error) {
 	if depth == current {
 		return
 	}
@@ -77,31 +77,9 @@ func structChildCopy(dst reflect.Value, src interface{}, depth int, current int)
 	if dst.Kind() == reflect.Ptr {
 		convDst = reflect.New(dst.Type().Elem())
 	}
-	if reflect.ValueOf(src).Kind() == reflect.Ptr {
-		src = reflect.ValueOf(src).Elem().Interface()
-	}
 
-	numSrcField := reflect.TypeOf(src).NumField()
-	valueMap := make(map[string]interface{}, numSrcField)
-
-	for index := 0; index < numSrcField; index++ {
-		fieldName := reflect.TypeOf(src).Field(index).Name
-		item := reflect.ValueOf(src).Field(index)
-		if !reflect.TypeOf(src).Field(index).IsExported() {
-			continue
-		}
-		if item.Kind() == reflect.Ptr {
-			if item.IsZero() || item.IsNil() {
-				//空指针跳过
-				continue
-			}
-			item = item.Elem()
-		}
-		fieldValue := item.Interface()
-		valueMap[fieldName] = fieldValue
-
-	}
-
+	valueMap := make(map[string]any)
+	getValMap(dst, src, valueMap, depth, 0)
 	numDstField := reflect.TypeOf(convDst.Interface()).NumField()
 	convType := reflect.TypeOf(convDst.Interface())
 	for index := 0; index < numDstField; index++ {
@@ -112,57 +90,56 @@ func structChildCopy(dst reflect.Value, src interface{}, depth int, current int)
 		if !fieldType.IsExported() {
 			continue
 		}
+		if valueMap[fieldName] == nil {
+			if !fieldType.Anonymous {
+				continue
+			}
+		}
+		srcVal := valueMap[fieldName]
 		//如果是匿名嵌套字段，则要判断src里是否存在同样的内容的结构
-		if fieldType.Anonymous && valueMap[fieldName] == nil {
+		if fieldType.Anonymous && srcVal == nil {
 			err = structChildCopy(fieldValue, src, depth, current)
 			if err != nil {
 				return
 			}
 			continue
 		}
-		if valueMap[fieldName] == nil || isBlank(reflect.ValueOf(valueMap[fieldName])) {
+		if isBlank(reflect.ValueOf(srcVal)) {
 			continue
 		}
-		if fieldValue.Type() == reflect.ValueOf(valueMap[fieldName]).Type() {
-			fieldValue.Set(reflect.ValueOf(valueMap[fieldName]))
+		if fieldValue.Type() == reflect.ValueOf(srcVal).Type() {
+			fieldValue.Set(reflect.ValueOf(srcVal))
 			continue
 		}
-
-		valueType := reflect.TypeOf(valueMap[fieldName]).Kind()
-		if reflect.ValueOf(valueMap[fieldName]).Type() == dst.Type() {
-			convDst.Field(index).Set(reflect.ValueOf(valueMap[fieldName]))
-			dst = convDst
-			return
-		}
+		valueType := reflect.TypeOf(srcVal).Kind()
+		var fValue any
 		switch valueType {
 		case reflect.Struct:
-
-			if reflect.TypeOf(valueMap[fieldName]).Implements(OtherDateType) {
+			if reflect.TypeOf(srcVal).Implements(OtherDateType) {
 				switch fieldValue.Interface().(type) {
 				case string:
-					fValue := valueMap[fieldName].(ConvCopy).String()
-					fieldValue.Set(reflect.ValueOf(fValue))
-					continue
+					fValue = srcVal.(ConvCopy).String()
+					setDstVal(fieldValue, reflect.ValueOf(fValue))
+				}
+			} else {
+				structCurrent := current + 1
+				err = structChildCopy(fieldValue, srcVal, depth, structCurrent)
+				if err != nil {
+					return
 				}
 			}
-			structCurrent := current + 1
-			err = structChildCopy(fieldValue, valueMap[fieldName], depth, structCurrent)
-			if err != nil {
-				return
-			}
-
 		case reflect.Slice:
-			if reflect.ValueOf(valueMap[fieldName]).Len() == 0 {
+			if reflect.ValueOf(srcVal).Len() == 0 {
 				continue
 			}
 			sliceCurrent := current + 1
-			err = sliceCopy(fieldValue, valueMap[fieldName], depth, sliceCurrent)
+			err = sliceCopy(fieldValue, srcVal, depth, sliceCurrent)
 			if err != nil {
 				return
 			}
 		default:
-			var fValue interface{}
-			fValue, err = checkTypeAndConv(reflect.ValueOf(valueMap[fieldName]), convDst.Field(index))
+
+			fValue, err = checkTypeAndConv(reflect.ValueOf(srcVal), convDst.Field(index))
 			if err != nil {
 				return
 			}
@@ -170,26 +147,58 @@ func structChildCopy(dst reflect.Value, src interface{}, depth int, current int)
 				switch fValue.(type) {
 				case string:
 					fValue = fieldValue.Interface().(ConvCopy).CopyStr(fValue.(string))
-				default:
-
 				}
 			}
 			if fieldValue.Kind() == reflect.Ptr {
 				//如果是个指针，则操作该指针给予新的地址
 				item := reflect.New(fieldValue.Type().Elem())
 				item.Elem().Set(reflect.ValueOf(fValue))
-				fieldValue.Set(item)
+				setDstVal(fieldValue, item)
 				continue
 			}
-			convDst.Field(index).Set(reflect.ValueOf(fValue))
-			dst = convDst
-
+			setDstVal(fieldValue, reflect.ValueOf(fValue))
 		}
 	}
 	return
 }
 
-func sliceCopy(dst reflect.Value, src interface{}, depth int, current int) (err error) {
+func getValMap(dst reflect.Value, src any, valMap map[string]any, depth int, current int) {
+	if reflect.ValueOf(src).Kind() == reflect.Ptr {
+		src = reflect.ValueOf(src).Elem().Interface()
+	}
+	numSrcField := reflect.TypeOf(src).NumField()
+	if !reflect.ValueOf(src).IsValid() {
+		return
+	}
+	if valMap == nil {
+		valMap = make(map[string]any)
+	}
+	for index := 0; index < numSrcField; index++ {
+		srcTp := reflect.TypeOf(src).Field(index)
+		fieldName := srcTp.Name
+		item := reflect.ValueOf(src).Field(index)
+		if !reflect.TypeOf(src).Field(index).IsExported() {
+			continue
+		}
+		if srcTp.Anonymous && dst.FieldByName(fieldName).IsValid() && dst.FieldByName(fieldName).Type() == item.Type() {
+			current++
+			getValMap(dst, item.Interface(), valMap, depth, current)
+		}
+		if item.Kind() == reflect.Ptr {
+			if item.IsZero() || item.IsNil() {
+				//空指针跳过
+				continue
+			}
+			item = item.Elem()
+		}
+		fieldValue := item.Interface()
+		if valMap[fieldName] == nil {
+			valMap[fieldName] = fieldValue
+		}
+	}
+}
+
+func sliceCopy(dst reflect.Value, src any, depth int, current int) (err error) {
 	if depth == current {
 		return
 	}
@@ -227,11 +236,13 @@ func sliceCopy(dst reflect.Value, src interface{}, depth int, current int) (err 
 			return
 		}
 		if dst.Kind() == reflect.Ptr {
-			convDst.Elem().Set(reflect.ValueOf(fValue))
-		} else {
-			convDst.Set(reflect.ValueOf(fValue))
+			convDst = convDst.Elem()
 		}
-		dst.Set(convDst)
+		if convDst.Type() == reflect.ValueOf(fValue).Type() {
+			convDst.Set(reflect.ValueOf(fValue))
+			dst.Set(convDst)
+		}
+
 		return
 	}
 	//结构体赋值
@@ -282,6 +293,13 @@ func CopyMap(dst interface{}, valueMap map[string]interface{}) (err error) {
 		}
 	}
 	return
+}
+
+func setDstVal(dst reflect.Value, src reflect.Value) {
+	if src.Type() != dst.Type() {
+		return
+	}
+	dst.Set(src)
 }
 
 // isBlank 非空校验
