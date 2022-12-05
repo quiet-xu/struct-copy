@@ -180,7 +180,8 @@ func getValMap(dst reflect.Value, src any, valMap map[string]any, depth int, cur
 		if !reflect.TypeOf(src).Field(index).IsExported() {
 			continue
 		}
-		if srcTp.Anonymous && dst.FieldByName(fieldName).IsValid() && dst.FieldByName(fieldName).Type() == item.Type() {
+		//如果被粘贴的目标是个匿名结构，并且被赋值目标中没有该字段
+		if srcTp.Anonymous && dst.FieldByName(fieldName) == (reflect.Value{}) {
 			current++
 			getValMap(dst, item.Interface(), valMap, depth, current)
 		}
