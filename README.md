@@ -38,7 +38,7 @@
 
 1. 如何下载？
    ```bash
-    go get https://github.com/quiet-xu/struct-copy@latest
+    go get github.com/quiet-xu/struct-copy@latest
    ```
 2. 如何使用？
    ```

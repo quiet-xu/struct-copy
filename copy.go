@@ -2,6 +2,7 @@ package struct_copy
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 )
 
@@ -80,12 +81,24 @@ func structChildCopy(dst reflect.Value, src any, depth int, current int) (err er
 
 	valueMap := make(map[string]any)
 	getValMap(dst, src, valueMap, depth, 0)
+	if convDst.Kind() == reflect.Ptr {
+		dst.Set(convDst)
+		convDst = convDst.Elem()
+	}
+
 	numDstField := reflect.TypeOf(convDst.Interface()).NumField()
 	convType := reflect.TypeOf(convDst.Interface())
 	for index := 0; index < numDstField; index++ {
 		fieldType := convType.Field(index)
 		fieldName := fieldType.Name
-		fieldValue := dst.Field(index)
+		var fieldValue reflect.Value
+
+		if dst.Kind() == reflect.Ptr {
+
+			fieldValue = dst.Elem().Field(index)
+		} else {
+			fieldValue = dst.Field(index)
+		}
 		//若非暴露的,则不需要set
 		if !fieldType.IsExported() {
 			continue
@@ -205,6 +218,20 @@ func sliceCopy(dst reflect.Value, src any, depth int, current int) (err error) {
 	}
 	var basicSlice int
 	switch src.(type) {
+	case []*string:
+		basicSlice++
+	case []*int64:
+		basicSlice++
+	case []*int32:
+		basicSlice++
+	case []*int:
+		basicSlice++
+	case []*float64:
+		basicSlice++
+	case []*float32:
+		basicSlice++
+	case []*byte:
+		basicSlice++
 	case []string:
 		basicSlice++
 	case []int64:
@@ -236,12 +263,32 @@ func sliceCopy(dst reflect.Value, src any, depth int, current int) (err error) {
 		if err != nil {
 			return
 		}
-		if dst.Kind() == reflect.Ptr {
-			convDst = convDst.Elem()
-		}
 		if convDst.Type() == reflect.ValueOf(fValue).Type() {
 			convDst.Set(reflect.ValueOf(fValue))
 			dst.Set(convDst)
+			return
+		}
+		fv := reflect.ValueOf(fValue)
+		if convDst.Kind() == reflect.Ptr {
+			for i := 0; i < fv.Len(); i++ {
+				item := reflect.New(convDst.Elem().Type().Elem())
+				item.Elem().Set(reflect.ValueOf(fv.Index(i).Interface()))
+				convDst.Elem().Set(reflect.Append(convDst.Elem(), item.Elem()))
+			}
+			if dst.Type() == convDst.Type() {
+				dst.Set(convDst)
+			}
+			return
+		} else if convDst.Type().Elem().Kind() == reflect.Ptr {
+			for i := 0; i < fv.Len(); i++ {
+				item := reflect.New(convDst.Type().Elem().Elem())
+				item.Elem().Set(reflect.ValueOf(fv.Index(i).Interface()))
+				convDst.Set(reflect.Append(convDst, item))
+			}
+			if dst.Type() == convDst.Type() {
+				dst.Set(convDst)
+			}
+			fmt.Println(1)
 		}
 
 		return
