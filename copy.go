@@ -2,7 +2,6 @@ package struct_copy
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 )
 
@@ -34,6 +33,12 @@ func StructCopy(dst any, src any, depth int) (err error) {
 	return
 }
 func checkTypeAndConv(newValue reflect.Value, dstField reflect.Value) (fValue any, err error) {
+	if newValue.Kind() == reflect.Ptr {
+		newValue = newValue.Elem()
+	}
+	if dstField.Kind() == reflect.Ptr {
+		dstField = dstField.Elem()
+	}
 	switch newValue.Interface().(type) {
 	case int32:
 		switch dstField.Interface().(type) {
@@ -258,39 +263,48 @@ func sliceCopy(dst reflect.Value, src any, depth int, current int) (err error) {
 	}
 	//基础数组赋值
 	if basicSlice > 0 {
-		var fValue interface{}
-		fValue, err = checkTypeAndConv(reflect.ValueOf(src), reflect.ValueOf(convDst))
-		if err != nil {
-			return
-		}
+		fValue := src
 		if convDst.Type() == reflect.ValueOf(fValue).Type() {
 			convDst.Set(reflect.ValueOf(fValue))
 			dst.Set(convDst)
 			return
 		}
 		fv := reflect.ValueOf(fValue)
+		convPrtType := 0
 		if convDst.Kind() == reflect.Ptr {
-			for i := 0; i < fv.Len(); i++ {
-				item := reflect.New(convDst.Elem().Type().Elem())
-				item.Elem().Set(reflect.ValueOf(fv.Index(i).Interface()))
-				convDst.Elem().Set(reflect.Append(convDst.Elem(), item.Elem()))
-			}
-			if dst.Type() == convDst.Type() {
-				dst.Set(convDst)
-			}
-			return
+			convPrtType = 1
 		} else if convDst.Type().Elem().Kind() == reflect.Ptr {
-			for i := 0; i < fv.Len(); i++ {
-				item := reflect.New(convDst.Type().Elem().Elem())
-				item.Elem().Set(reflect.ValueOf(fv.Index(i).Interface()))
-				convDst.Set(reflect.Append(convDst, item))
-			}
-			if dst.Type() == convDst.Type() {
-				dst.Set(convDst)
-			}
-			fmt.Println(1)
+			convPrtType = 2
 		}
-
+		for i := 0; i < fv.Len(); i++ {
+			var item reflect.Value
+			if convPrtType == 1 {
+				item = reflect.New(convDst.Elem().Type().Elem())
+			} else if convPrtType == 2 {
+				item = reflect.New(convDst.Type().Elem().Elem())
+			} else {
+				item = reflect.New(convDst.Type().Elem())
+			}
+			var f any
+			f, err = checkTypeAndConv(reflect.ValueOf(fv.Index(i).Interface()), item)
+			if err != nil {
+				return
+			}
+			if convPrtType == 1 {
+				item.Elem().Set(reflect.ValueOf(f))
+				//item.Elem().Set(reflect.ValueOf(fv.Index(i).Interface()))
+				convDst.Elem().Set(reflect.Append(convDst.Elem(), item.Elem()))
+			} else if convPrtType == 2 {
+				item.Elem().Set(reflect.ValueOf(f))
+				convDst.Set(reflect.Append(convDst, item))
+			} else {
+				item.Elem().Set(reflect.ValueOf(f))
+				convDst.Set(reflect.Append(convDst, item.Elem()))
+			}
+		}
+		if dst.Type() == convDst.Type() {
+			dst.Set(convDst)
+		}
 		return
 	}
 	//结构体赋值
