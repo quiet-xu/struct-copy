@@ -6,20 +6,21 @@ import (
 )
 
 type A1 struct {
-	A []string
-	B []C1
-	C []string
-	D string
-	E *[]C1
-	F Datetime
-	G C1
-	H []*string
-	I []string
-	K []*C1
-	J []C1
-	L []int32
-	M []int64
-	N []*int32
+	A  []string
+	B  []C1
+	C  []string
+	D  string
+	E  *[]C1
+	F  Datetime
+	G  C1
+	H  []*string
+	I  []string
+	K  []*C1
+	J  []C1
+	L  []int32
+	M  []int64
+	N  []*int32
+	AA string
 }
 type B1 struct {
 	A []string
@@ -28,14 +29,15 @@ type B1 struct {
 	D *string
 	E []C1
 	//F Datetime
-	G C1
-	H []string
-	I []*string
-	K []C1
-	J []*C1
-	L []int
-	M []int
-	N []int
+	G  C1
+	H  []string
+	I  []*string
+	K  []C1
+	J  []*C1
+	L  []int
+	M  []int
+	N  []int
+	AA string
 }
 type C1 struct {
 	C1A string
@@ -48,7 +50,7 @@ func TestName(t *testing.T) {
 	//one.C = []string{"1", "2"}
 	//one.D = PStr("1")
 
-	one.D = "1"
+	//one.D = "1"
 	one.A = []string{"1", "2"}
 	one.B = []C1{{C1A: "1"}, {C1A: "2"}}
 	one.E = &[]C1{{C1A: "1"}, {C1A: "3"}}
@@ -65,8 +67,15 @@ func TestName(t *testing.T) {
 		PInt32(2),
 	}
 	var two B1 //被赋值的
-	err := StructCopy(&two, one, 1<<4)
+	two.AA = "111"
+	c := NewCopy(1 << 4)
+
+	//err := c.SetOmitBlank().Copy(&two, one)
+	//err := StructCopy(&two, one, 1<<4)
+	//t.Log(err, two)
+	err := c.SliceCopy(two.A, one.A)
 	t.Log(err, two)
+
 	//addr.Field(0).Set(reflect.ValueOf("1"))
 	//t.Log(addr.Interface())
 }
