@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+type Number uint16
+type Str string
+type Fl float32
+
 type A1 struct {
 	A  []string
 	B  []C1
@@ -21,6 +25,9 @@ type A1 struct {
 	M  []int64
 	N  []*int32
 	AA string
+	BB Number
+	CC string
+	DD Fl
 }
 type B1 struct {
 	A []string
@@ -38,6 +45,9 @@ type B1 struct {
 	M  []int
 	N  []int
 	AA string
+	BB uint16
+	CC Str
+	DD float32
 }
 type C1 struct {
 	C1A string
@@ -46,10 +56,7 @@ type C1 struct {
 func TestName(t *testing.T) {
 
 	var one A1 //要复制的
-
 	//one.C = []string{"1", "2"}
-	//one.D = PStr("1")
-
 	//one.D = "1"
 	one.A = []string{"1", "2"}
 	one.B = []C1{{C1A: "1"}, {C1A: "2"}}
@@ -66,18 +73,13 @@ func TestName(t *testing.T) {
 		PInt32(1),
 		PInt32(2),
 	}
+	one.BB = 31
+	one.CC = "奥斯卡"
+	one.DD = 33.11
 	var two B1 //被赋值的
-	two.AA = "111"
-	c := NewCopy(1 << 4)
+	err := Copy(&two, &one)
+	t.Log(err)
 
-	//err := c.SetOmitBlank().Copy(&two, one)
-	//err := StructCopy(&two, one, 1<<4)
-	//t.Log(err, two)
-	err := c.SliceCopy(two.A, one.A)
-	t.Log(err, two)
-
-	//addr.Field(0).Set(reflect.ValueOf("1"))
-	//t.Log(addr.Interface())
 }
 func PStr(a string) *string {
 	return &a

@@ -7,8 +7,19 @@ import (
 
 var OtherDateType = reflect.TypeOf((*ConvCopy)(nil)).Elem()
 
-//StructCopy 指针接收 / 非指针发送 / 深度 单位 个
+// Copy （被赋值的指针参数，需要被复制的值） 默认 1<<4 个深度
+func Copy(dst any, src any) (err error) {
+	return StructCopy(dst, src, 1<<4)
+}
+
+// StructCopy 指针接收 / 非指针发送 / 深度 单位 个
 func StructCopy(dst any, src any, depth int) (err error) {
+	if src == nil {
+		return
+	}
+	if dst == nil {
+		return
+	}
 	//类型判断并声明  防重复反射
 	dstType := reflect.TypeOf(dst)
 	srcType := reflect.TypeOf(src)
@@ -22,6 +33,8 @@ func StructCopy(dst any, src any, depth int) (err error) {
 			return
 		}
 		src = reflect.ValueOf(src).Elem().Interface()
+		srcType = srcType.Elem()
+
 	}
 	if srcType.Kind() != reflect.Struct {
 		err = errors.New("src value not a struct")
@@ -34,10 +47,10 @@ func StructCopy(dst any, src any, depth int) (err error) {
 }
 func checkTypeAndConv(newValue reflect.Value, dstField reflect.Value) (fValue any, err error) {
 	if newValue.Kind() == reflect.Ptr {
-		newValue = newValue.Elem()
+		newValue = newValue.Elem() // 有数据的
 	}
 	if dstField.Kind() == reflect.Ptr {
-		dstField = dstField.Elem()
+		dstField = dstField.Elem() //没数据的
 	}
 	switch newValue.Interface().(type) {
 	case int32:
@@ -68,12 +81,45 @@ func checkTypeAndConv(newValue reflect.Value, dstField reflect.Value) (fValue an
 			fValue = newValue.Interface()
 		}
 	default:
-		fValue = newValue.Interface()
+		switch newValue.Kind() {
+		case reflect.Bool:
+			fValue = newValue.Bool()
+		case reflect.Int:
+			fValue = int(newValue.Int())
+		case reflect.Int8:
+			fValue = int8(newValue.Int())
+		case reflect.Int16:
+			fValue = int16(newValue.Int())
+		case reflect.Int32:
+			fValue = int32(newValue.Int())
+		case reflect.Int64:
+			fValue = newValue.Int()
+		case reflect.Uint:
+			fValue = uint(newValue.Uint())
+		case reflect.Uint8:
+			fValue = uint8(newValue.Uint())
+		case reflect.Uint16:
+			fValue = uint16(newValue.Uint())
+		case reflect.Uint32:
+			fValue = uint32(newValue.Uint())
+		case reflect.Uint64:
+			fValue = newValue.Uint()
+		case reflect.Float32:
+			fValue = float32(newValue.Float())
+		case reflect.Float64:
+			fValue = float64(newValue.Float())
+		case reflect.String:
+			fValue = newValue.String()
+
+		default:
+			fValue = newValue.Interface()
+		}
+
 	}
 	return
 }
 
-//structChildCopy 结构体子层copy
+// structChildCopy 结构体子层copy
 func structChildCopy(dst reflect.Value, src any, depth int, current int) (err error) {
 	if depth == current {
 		return
@@ -133,6 +179,7 @@ func structChildCopy(dst reflect.Value, src any, depth int, current int) (err er
 		var fValue any
 		switch valueType {
 		case reflect.Struct:
+			//if reflect
 			if reflect.TypeOf(srcVal).Implements(OtherDateType) {
 				switch fieldValue.Interface().(type) {
 				case string:
@@ -358,10 +405,38 @@ func CopyMap(dst interface{}, valueMap map[string]interface{}) (err error) {
 }
 
 func setDstVal(dst reflect.Value, src reflect.Value) {
-	if src.Type() != dst.Type() {
+	if !dst.CanSet() {
 		return
 	}
-	dst.Set(src)
+	if src.Type() != dst.Type() {
+		switch dst.Kind() {
+		case reflect.Bool:
+			dst.SetBool(src.Bool())
+		case reflect.Int,
+			reflect.Int8,
+			reflect.Int16,
+			reflect.Int32,
+			reflect.Int64:
+			dst.SetInt(src.Int())
+		case reflect.Uint,
+			reflect.Uint8,
+			reflect.Uint16,
+			reflect.Uint32,
+			reflect.Uint64:
+			dst.SetUint(src.Uint())
+		case reflect.Float32,
+			reflect.Float64:
+			dst.SetFloat(src.Float())
+
+		case reflect.String:
+			dst.SetString(src.String())
+		default:
+			return
+		}
+	} else {
+		dst.Set(src)
+	}
+
 }
 
 // isBlank 非空校验
