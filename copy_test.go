@@ -9,10 +9,47 @@ type Number uint16
 type Str string
 type Fl float32
 
+//type A1 struct {
+//	//D string
+//	//H *string
+//	B int32
+//}
+//type B1 struct {
+//	B *int32
+//	//D *string
+//	//H *string
+//}
+
+type B1 struct {
+	A  []string
+	B  []C1
+	C  *[]string
+	EE *int32
+	FF int32
+	D  *string
+	E  []C1
+	//F Datetime
+	G  C1
+	H  []string
+	I  []*string
+	K  []C1
+	J  []*C1
+	L  []int
+	M  []int
+	N  []int
+	AA string
+	BB uint16
+	CC Str
+	DD float32
+}
+
 type A1 struct {
 	A  []string
 	B  []C1
 	C  []string
+	EE int32
+	FF *int32
+
 	D  string
 	E  *[]C1
 	F  Datetime
@@ -29,26 +66,6 @@ type A1 struct {
 	CC string
 	DD Fl
 }
-type B1 struct {
-	A []string
-	B []C1
-	C *[]string
-	D *string
-	E []C1
-	//F Datetime
-	G  C1
-	H  []string
-	I  []*string
-	K  []C1
-	J  []*C1
-	L  []int
-	M  []int
-	N  []int
-	AA string
-	BB uint16
-	CC Str
-	DD float32
-}
 type C1 struct {
 	C1A string
 }
@@ -56,8 +73,8 @@ type C1 struct {
 func TestName(t *testing.T) {
 
 	var one A1 //要复制的
-	//one.C = []string{"1", "2"}
-	//one.D = "1"
+	one.C = []string{"1", "2"}
+	one.D = "1"
 	one.A = []string{"1", "2"}
 	one.B = []C1{{C1A: "1"}, {C1A: "2"}}
 	one.E = &[]C1{{C1A: "1"}, {C1A: "3"}}
@@ -73,12 +90,15 @@ func TestName(t *testing.T) {
 		PInt32(1),
 		PInt32(2),
 	}
+	one.EE = 1
 	one.BB = 31
 	one.CC = "奥斯卡"
 	one.DD = 33.11
+	aaa := int32(1)
+	one.FF = &aaa
 	var two B1 //被赋值的
 	err := Copy(&two, &one)
-	t.Log(err)
+	t.Log(two, err)
 
 }
 func PStr(a string) *string {

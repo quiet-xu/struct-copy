@@ -50,7 +50,13 @@ func checkTypeAndConv(newValue reflect.Value, dstField reflect.Value) (fValue an
 		newValue = newValue.Elem() // 有数据的
 	}
 	if dstField.Kind() == reflect.Ptr {
-		dstField = dstField.Elem() //没数据的
+		if dstField.Elem() == (reflect.Value{}) {
+			dstField = reflect.New(dstField.Type().Elem())
+
+		} else {
+			dstField = dstField.Elem()
+		}
+
 	}
 	switch newValue.Interface().(type) {
 	case int32:
