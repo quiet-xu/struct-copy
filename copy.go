@@ -3,6 +3,7 @@ package struct_copy
 import (
 	"errors"
 	"reflect"
+	"time"
 )
 
 var OtherDateType = reflect.TypeOf((*ConvCopy)(nil)).Elem()
@@ -58,7 +59,12 @@ func checkTypeAndConv(newValue reflect.Value, dstField reflect.Value) (fValue an
 		}
 
 	}
-	switch newValue.Interface().(type) {
+	switch x := newValue.Interface().(type) {
+	case time.Time:
+		switch dstField.Interface().(type) {
+		case string:
+			fValue = x.String()
+		}
 	case int32:
 		switch dstField.Interface().(type) {
 		case int:
@@ -142,7 +148,6 @@ func structChildCopy(dst reflect.Value, src any, depth int, current int) (err er
 		dst.Set(convDst)
 		convDst = convDst.Elem()
 	}
-
 	numDstField := reflect.TypeOf(convDst.Interface()).NumField()
 	convType := reflect.TypeOf(convDst.Interface())
 	for index := 0; index < numDstField; index++ {
@@ -186,19 +191,29 @@ func structChildCopy(dst reflect.Value, src any, depth int, current int) (err er
 		switch valueType {
 		case reflect.Struct:
 			//if reflect
-			if reflect.TypeOf(srcVal).Implements(OtherDateType) {
-				switch fieldValue.Interface().(type) {
-				case string:
-					fValue = srcVal.(ConvCopy).String()
-					setDstVal(fieldValue, reflect.ValueOf(fValue))
-				}
-			} else {
-				structCurrent := current + 1
-				err = structChildCopy(fieldValue, srcVal, depth, structCurrent)
+			switch srcVal.(type) {
+			case time.Time:
+				fValue, err = checkTypeAndConv(reflect.ValueOf(srcVal), convDst.Field(index))
 				if err != nil {
 					return
 				}
+				setDstVal(fieldValue, reflect.ValueOf(fValue))
+			default:
+				if reflect.TypeOf(srcVal).Implements(OtherDateType) {
+					switch fieldValue.Interface().(type) {
+					case string:
+						fValue = srcVal.(ConvCopy).String()
+						setDstVal(fieldValue, reflect.ValueOf(fValue))
+					}
+				} else {
+					structCurrent := current + 1
+					err = structChildCopy(fieldValue, srcVal, depth, structCurrent)
+					if err != nil {
+						return
+					}
+				}
 			}
+
 		case reflect.Slice:
 			if reflect.ValueOf(srcVal).Len() == 0 {
 				continue
@@ -252,9 +267,15 @@ func getValMap(dst reflect.Value, src any, valMap map[string]any, depth int, cur
 			continue
 		}
 		//如果被粘贴的目标是个匿名结构，并且被赋值目标中没有该字段
-		if srcTp.Anonymous && dst.FieldByName(fieldName) == (reflect.Value{}) {
-			current++
-			getValMap(dst, item.Interface(), valMap, depth, current)
+		if srcTp.Anonymous {
+			newDst := dst
+			if dst.Kind() == reflect.Ptr {
+				newDst = reflect.New(dst.Type().Elem()).Elem()
+			}
+			if newDst.FieldByName(fieldName) == (reflect.Value{}) {
+				current++
+				getValMap(newDst, item.Interface(), valMap, depth, current)
+			}
 		}
 		if item.Kind() == reflect.Ptr {
 			if item.IsZero() || item.IsNil() {
